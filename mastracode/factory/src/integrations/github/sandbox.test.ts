@@ -124,6 +124,28 @@ describe('materializeRepo', () => {
     expect(dbUpdates.at(-1)).toHaveProperty('materializedAt');
   });
 
+  it('clones a self-hosted GitLab subgroup URL with provider credentials and scrubs it', async () => {
+    const sandbox = new FakeSandbox();
+    await materializeRepo(
+      makeRow({ materializedAt: null }),
+      makeRepoInfo({
+        repoFullName: 'acme/platform/app',
+        cloneUrl: 'https://gitlab.example.com/acme/platform/app.git',
+        authUsername: 'oauth2',
+      }),
+      sandbox,
+      'glpat-secret@value',
+    );
+
+    const joined = sandbox.calls.join(String.fromCharCode(10));
+    expect(joined).toContain(
+      'https://oauth2:glpat-secret%40value@gitlab.example.com/acme/platform/app.git',
+    );
+    const scrub = sandbox.calls.filter(call => call.includes('remote set-url origin')).at(-1);
+    expect(scrub).toContain('https://gitlab.example.com/acme/platform/app.git');
+    expect(scrub).not.toContain('glpat-secret');
+  });
+
   it('pulls (not clones) on re-open', async () => {
     const sandbox = new FakeSandbox(script => {
       if (script.includes('remote get-url origin')) {

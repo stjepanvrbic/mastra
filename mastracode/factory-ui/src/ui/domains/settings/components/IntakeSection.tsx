@@ -355,8 +355,7 @@ export function IntakeSection() {
   const gitlabAuthError = isGitLabAuthError(gitlabProjectsQuery.error);
   const gitlabReauthRequired = isGitLabReauthRequired(gitlabStatus);
   const gitlabSourceIds = config.gitlab.sourceIds ?? [];
-  const gitlabReady =
-    gitlabConfigured && config.gitlab.enabled && !gitlabAuthError && !gitlabReauthRequired && gitlabProjects.length > 0;
+  const gitlabReady = gitlabConfigured && config.gitlab.enabled && !gitlabAuthError && gitlabProjects.length > 0;
   const linearProjects = linearProjectsQuery.data ?? [];
   const reauthRequired = isLinearReauthError(linearProjectsQuery.error);
   const routedProjectIds = config.linear.sourceIds ?? [];

@@ -443,6 +443,32 @@ describe('IntakeSection', () => {
   });
 
   describe('given GitLab is configured', () => {
+    it('keeps healthy projects available when another connection needs reauthorization', async () => {
+      useGitLabHandlers({
+        ...baseConfig(),
+        gitlab: { enabled: true, sourceIds: null },
+      });
+      server.use(
+        http.get(GITLAB_STATUS_URL, () =>
+          HttpResponse.json({
+            ...gitlabReadyStatus,
+            connections: [
+              ...gitlabReadyStatus.connections!,
+              { id: 'a1b_old', integrationId: 'gitlab', status: 'needs_reauth', accountLabel: 'old' },
+            ],
+            reauthRequired: true,
+          } satisfies GitLabStatus),
+        ),
+      );
+
+      renderIntakeSection();
+
+      expect(
+        await screen.findByText('A GitLab account needs to be reconnected in Mastra Platform.'),
+      ).toBeInTheDocument();
+      expect(await screen.findByRole('checkbox', { name: 'acme/app' })).toBeInTheDocument();
+    });
+
     it('selects a project and routes it to a Factory through generic bindings', async () => {
       seedFactories();
       const { saved, savedBindings } = useGitLabHandlers({

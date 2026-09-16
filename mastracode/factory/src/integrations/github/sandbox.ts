@@ -205,10 +205,49 @@ function cleanUrl(repoFullName: string): string {
   return `https://github.com/${repoFullName}.git`;
 }
 
+function authenticatedUrl(cloneUrl: string, token: string, username: string): string {
+  let url: URL;
+  try {
+    url = new URL(cloneUrl);
+  } catch {
+    throw new MaterializeError('Refusing to materialize: invalid repository clone URL.', 'clone-failed');
+  }
+  if (
+    url.protocol !== 'https:' ||
+    !url.hostname ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    !username
+  ) {
+    throw new MaterializeError('Refusing to materialize: invalid repository clone URL.', 'clone-failed');
+  }
+  url.username = username;
+  url.password = token;
+  return url.toString();
+}
+
+function normalizedRemoteUrl(value: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || !url.hostname) return null;
+  const pathname = url.pathname.replace(/\/+$/, '').replace(/\.git$/i, '');
+  return `https://${url.host.toLowerCase()}${pathname}`;
+}
+
 /** Repo metadata needed to materialize, read from the org-owned project row. */
 export interface RepoMaterializeInfo {
   repoFullName: string;
   defaultBranch: string;
+  /** Provider-supplied, credential-free HTTPS clone URL. */
+  cloneUrl?: string;
+  /** Username paired with the bearer token for git-over-HTTPS. */
+  authUsername?: string;
 }
 
 /** Options for {@link materializeRepo}. */
@@ -241,7 +280,7 @@ async function materializeRepoImpl(options: MaterializeRepoOptions): Promise<voi
   // 0. Defense in depth: never build a git command from values that aren't
   // strictly shaped, even if a malformed row reached the DB. Inputs are also
   // validated at the route boundary before storage.
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+  if (!/^[\w.-]+(?:\/[\w.-]+)+$/.test(repo)) {
     throw new MaterializeError(`Refusing to materialize: invalid repo full name '${repo}'.`, 'clone-failed');
   }
   if (!/^[A-Za-z0-9_./-]+$/.test(repoInfo.defaultBranch)) {
@@ -260,7 +299,8 @@ async function materializeRepoImpl(options: MaterializeRepoOptions): Promise<voi
     );
   }
 
-  const authUrl = tokenUrl(repo, token);
+  const cleanCloneUrl = repoInfo.cloneUrl ?? cleanUrl(repo);
+  const authUrl = authenticatedUrl(cleanCloneUrl, token, repoInfo.authUsername ?? 'x-access-token');
 
   // The DB's `materializedAt` can drift from disk in both directions: a fresh
   // binding row over an already-populated workdir (local dev DB resets,
@@ -270,7 +310,7 @@ async function materializeRepoImpl(options: MaterializeRepoOptions): Promise<voi
   // instead of running `git -C <workdir>` against a directory that no longer
   // exists. Disk is the source of truth: detect the checkout instead of
   // trusting the row.
-  const alreadyMaterialized = await hasExistingCheckout(sandbox, workdir, repo);
+  const alreadyMaterialized = await hasExistingCheckout(sandbox, workdir, repo, cleanCloneUrl);
 
   let tokenInRemote = false;
   try {
@@ -341,12 +381,12 @@ async function materializeRepoImpl(options: MaterializeRepoOptions): Promise<voi
     // config. The scrub must never hide the actionable failure, but once the
     // token reached the remote its own failure can't stay silent either:
     // report both, primary cause and classification first.
-    throw await scrubbedFailure(sandbox, workdir, repo, tokenInRemote, primary, 'pull-failed');
+    throw await scrubbedFailure(sandbox, workdir, repo, tokenInRemote, primary, 'pull-failed', cleanCloneUrl);
   }
 
   // 3b. Success — the token is in the remote and the workdir has a `.git`, so
   // a failed scrub means the token may still be persisted: surface it.
-  await scrubRemote(sandbox, workdir, repo, tokenInRemote);
+  await scrubRemote(sandbox, workdir, repo, tokenInRemote, cleanCloneUrl);
 
   // 4. Mark materialized.
   await storage.markMaterialized({ id: sandboxRow.id });
@@ -356,7 +396,14 @@ async function materializeRepoImpl(options: MaterializeRepoOptions): Promise<voi
 export async function checkoutSessionBranch(
   sandbox: ExecutableSandbox,
   workdir: string,
-  options: { branch: string; baseBranch: string; token: string; repoFullName: string },
+  options: {
+    branch: string;
+    baseBranch: string;
+    token: string;
+    repoFullName: string;
+    cloneUrl?: string;
+    authUsername?: string;
+  },
 ): Promise<void> {
   return timedPhase('workspace.checkout', () => checkoutSessionBranchImpl(sandbox, workdir, options));
 }
@@ -369,7 +416,16 @@ async function checkoutSessionBranchImpl(
     baseBranch,
     token,
     repoFullName,
-  }: { branch: string; baseBranch: string; token: string; repoFullName: string },
+    cloneUrl,
+    authUsername,
+  }: {
+    branch: string;
+    baseBranch: string;
+    token: string;
+    repoFullName: string;
+    cloneUrl?: string;
+    authUsername?: string;
+  },
 ): Promise<void> {
   if (!isValidGitRef(branch) || !isValidGitRef(baseBranch)) {
     throw new MaterializeError('Refusing to create a session from an invalid branch name.', 'clone-failed');
@@ -397,7 +453,8 @@ async function checkoutSessionBranchImpl(
     return;
   }
 
-  const authUrl = tokenUrl(repoFullName, token);
+  const cleanCloneUrl = cloneUrl ?? cleanUrl(repoFullName);
+  const authUrl = authenticatedUrl(cleanCloneUrl, token, authUsername ?? 'x-access-token');
   try {
     const setUrl = await sh(sandbox, `git -C ${shellQuote(workdir)} remote set-url origin ${shellQuote(authUrl)}`);
     if (setUrl.exitCode !== 0) throw classifyGitFailure(setUrl, 'pull-failed');
@@ -439,7 +496,7 @@ async function checkoutSessionBranchImpl(
       }
     }
   } finally {
-    await sh(sandbox, `git -C ${shellQuote(workdir)} remote set-url origin ${shellQuote(cleanUrl(repoFullName))}`);
+    await sh(sandbox, `git -C ${shellQuote(workdir)} remote set-url origin ${shellQuote(cleanCloneUrl)}`);
   }
 }
 
@@ -475,12 +532,11 @@ export async function hasExistingCheckout(
   sandbox: ExecutableSandbox,
   workdir: string,
   repoFullName: string,
+  cloneUrl: string = cleanUrl(repoFullName),
 ): Promise<boolean> {
   const result = await sh(sandbox, `git -C ${shellQuote(workdir)} remote get-url origin`);
   if (result.exitCode !== 0) return false;
-  const url = result.stdout.trim().toLowerCase();
-  const suffix = `github.com/${repoFullName.toLowerCase()}`;
-  return url.endsWith(`${suffix}.git`) || url.endsWith(suffix);
+  return normalizedRemoteUrl(result.stdout.trim()) === normalizedRemoteUrl(cloneUrl);
 }
 
 /** Probed without `git -C` so a missing workdir returns false instead of throwing. */
@@ -503,8 +559,9 @@ async function scrubRemote(
   workdir: string,
   repoFullName: string,
   tokenInRemote: boolean,
+  cloneUrl: string = cleanUrl(repoFullName),
 ): Promise<void> {
-  const scrub = `git -C ${shellQuote(workdir)} remote set-url origin ${shellQuote(cleanUrl(repoFullName))}`;
+  const scrub = `git -C ${shellQuote(workdir)} remote set-url origin ${shellQuote(cloneUrl)}`;
   if (!tokenInRemote) {
     await sh(sandbox, scrub).catch(() => undefined);
     return;
@@ -533,9 +590,10 @@ async function scrubbedFailure(
   tokenInRemote: boolean,
   primary: unknown,
   fallback: MaterializeError['code'],
+  cloneUrl?: string,
 ): Promise<unknown> {
   try {
-    await scrubRemote(sandbox, workdir, repoFullName, tokenInRemote);
+    await scrubRemote(sandbox, workdir, repoFullName, tokenInRemote, cloneUrl);
     return primary;
   } catch (scrubError) {
     const scrubMessage = scrubError instanceof Error ? scrubError.message : String(scrubError);
