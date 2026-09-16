@@ -75,3 +75,8 @@ export type { SubAgent, SubAgentGenerateResult, SubAgentStreamResult } from './s
 export { isAgentCompatible } from './subagent';
 
 export type { MastraLanguageModel, MastraLegacyLanguageModel } from '../llm/model/shared.types';
+
+// Agents that override `stream()` (SDK-backed agents wrapping an external harness) need the same
+// thread bookkeeping `Agent.stream` does: register the run so it is pumped and observed as finished,
+// and drain signals queued while it worked.
+export { agentThreadStreamRuntime } from './thread-stream-runtime';
