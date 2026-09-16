@@ -1,5 +1,50 @@
 # @mastra/core
 
+## 1.68.0-alpha.3
+
+### Minor Changes
+
+- Added root span details to queryTraces results: name, entityId, parentSpanId, createdAt, metadata, and inputPreview. Trace lists can display these fields without fetching each full trace. createdAt uses the root span start time; inputPreview contains a shortened input preview rather than the full input. ([#23958](https://github.com/mastra-ai/mastra/pull/23958))
+
+  ```ts
+  const { traces } = await client.queryTraces({
+    timeRange: { from: '2026-09-01T00:00:00Z', to: '2026-09-15T00:00:00Z' },
+  });
+  // Previously required fetching the full trace:
+  console.log(traces[0]?.name, traces[0]?.inputPreview, traces[0]?.metadata);
+  ```
+
+- Added dataset snapshot format utilities to validate portable identities, preserve authored JSON fields and required item creation and update timestamps, and detect artifact changes with an integrity digest. These utilities do not read or write dataset storage. Both helpers accept a configurable `maxBytes` budget (4 MiB by default), independent of the artifact format and integrity digest. ([#23902](https://github.com/mastra-ai/mastra/pull/23902))
+
+  ```ts
+  import { parseDatasetSnapshot } from '@mastra/core/datasets';
+
+  const snapshot = parseDatasetSnapshot(artifactJson, { maxBytes: 8 * 1024 * 1024 });
+  ```
+
+### Patch Changes
+
+- Fixed tool approval failing on runs with large workflow snapshots. `agent.approveToolCall()`, `declineToolCall()`, and `resumeStream({ toolCallId })` could throw `AGENT_RESUME_TOOL_CALL_NOT_SUSPENDED` for a run that was genuinely suspended. This happened when saving a large snapshot took longer than the fixed 2-second validation window. The validator now waits while the run is still persisting its suspension, and rejects right away when the tool call is stale or the run has already finished. Fixes #22413. ([#24171](https://github.com/mastra-ai/mastra/pull/24171))
+
+- Fixed a memory and connection leak in `DurableAgent`. After a run finished, the automatic cleanup timer released the run's registry state but left the stream subscription attached for the life of the process, so memory (and on Redis/Valkey streams, a client connection per run) grew with every turn. `stream()`, `resume()`, and `recover()` now release the subscription during automatic cleanup, the same way `observe()` already did. Fixes #24070. ([#24104](https://github.com/mastra-ai/mastra/pull/24104))
+
+- Add `'canceled'` to the public workflow step-status contract. `StepResult`, `SerializedStepResult`, and the derived `WorkflowStepStatus` now include a `StepCanceled` variant, matching the `status: 'canceled'` results the runtime already emits and persists for canceled control-flow steps (e.g. `foreach` and loops). Typed consumers of `getWorkflowRunById()`, `WorkflowState.steps`, and lifecycle callback step results can now represent canceled steps without casts. ([#24098](https://github.com/mastra-ai/mastra/pull/24098))
+
+  ```ts
+  import type { WorkflowStepStatus } from '@mastra/core/workflows';
+
+  const run = await workflow.getWorkflowRunById(runId);
+  const step = run?.steps?.['process-items'];
+  if (step && !Array.isArray(step)) {
+    const status: WorkflowStepStatus = step.status; // may now be 'canceled'
+    if (status === 'canceled') {
+      console.log('canceled with partial output:', step.output);
+    }
+  }
+  ```
+
+  Note: if you have an exhaustive `switch` or a `Record<WorkflowStepStatus, ...>` over step statuses, TypeScript will now require a `'canceled'` case. This reflects a value the runtime was already producing.
+
 ## 1.68.0-alpha.2
 
 ### Minor Changes

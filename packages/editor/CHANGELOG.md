@@ -1,5 +1,14 @@
 # @mastra/editor
 
+## 0.15.1-alpha.2
+
+### Patch Changes
+
+- Fixed conditional processor graphs running their fallback branch alongside a matching rule. A default branch (a condition with no rules) now runs only when no explicit rule matches. The internal pass-through runs only when no rule matches and no default exists. A fallback processor no longer mutates messages or causes side effects when an explicit condition already matched. ([#24095](https://github.com/mastra-ai/mastra/pull/24095))
+
+- Updated dependencies [[`b2942c0`](https://github.com/mastra-ai/mastra/commit/b2942c0f3c99dd1edba9dc8c2c17bfa55c851ae8), [`99fab39`](https://github.com/mastra-ai/mastra/commit/99fab399c35952ae15427ea64845d4762e9ec144), [`d65d4d4`](https://github.com/mastra-ai/mastra/commit/d65d4d40a24a482d5b0ee83d9bab6042702ca1be), [`3589cde`](https://github.com/mastra-ai/mastra/commit/3589cde4ea8dd210df6b9a2355a3e568210965fc), [`07ff1b8`](https://github.com/mastra-ai/mastra/commit/07ff1b8eafbd9c7786ef77decc6be3b63497cfd9)]:
+  - @mastra/core@1.68.0-alpha.3
+
 ## 0.15.1-alpha.1
 
 ### Patch Changes

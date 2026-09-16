@@ -1,5 +1,66 @@
 # @mastra/playground-ui
 
+## 56.0.0-alpha.3
+
+### Minor Changes
+
+- Switched Studio traces and thread views to trace queries with cursor pagination. Removed unsupported filters, Running status, and Subtraces controls; unsupported stores now surface query errors instead of falling back to legacy lists. The default window is seven days, and query-backed lists refresh every 10 seconds without new-row highlighting. ([#23958](https://github.com/mastra-ai/mastra/pull/23958))
+
+- Added `useTraceQuery` to build trace lists that load more results as users scroll, without managing pagination cursors or duplicate traces manually. ([#23958](https://github.com/mastra-ai/mastra/pull/23958))
+
+  Render the component inside your existing `MastraReactProvider` and React Query `QueryClientProvider`. Supply a time range and attach `setEndOfListElement` after the trace rows to enable automatic pagination:
+
+  ```tsx
+  import { useTraceQuery } from '@mastra/playground-ui/domains/traces';
+
+  export function TraceList() {
+    const { data, setEndOfListElement } = useTraceQuery({
+      query: {
+        timeRange: {
+          from: '2026-09-01T00:00:00.000Z',
+          to: '2026-09-08T00:00:00.000Z',
+        },
+      },
+    });
+
+    return (
+      <div>
+        {data?.map(trace => (
+          <div key={trace.traceId}>{trace.name}</div>
+        ))}
+        <div ref={setEndOfListElement} />
+      </div>
+    );
+  }
+  ```
+
+- Shared collapsible reasoning between Studio and Factory using inline Markdown styling. Factory now shows streaming and redacted reasoning states; Studio keeps its expand and collapse controls. ([#24166](https://github.com/mastra-ai/mastra/pull/24166))
+
+  The shared renderer accepts reasoning parts from `MessageFactory`:
+
+  ```tsx
+  import { ReasoningPartRenderer } from '@mastra/playground-ui/domains/chat/messages/renderers/reasoning-part-renderer';
+
+  <ReasoningPartRenderer part={{ type: 'reasoning', reasoning: 'Checking the result…', state: 'streaming' }} />;
+  ```
+
+### Patch Changes
+
+- Added root span details to queryTraces results: name, entityId, parentSpanId, createdAt, metadata, and inputPreview. Trace lists can display these fields without fetching each full trace. createdAt uses the root span start time; inputPreview contains a shortened input preview rather than the full input. ([#23958](https://github.com/mastra-ai/mastra/pull/23958))
+
+  ```ts
+  const { traces } = await client.queryTraces({
+    timeRange: { from: '2026-09-01T00:00:00Z', to: '2026-09-15T00:00:00Z' },
+  });
+  // Previously required fetching the full trace:
+  console.log(traces[0]?.name, traces[0]?.inputPreview, traces[0]?.metadata);
+  ```
+
+- Updated dependencies [[`b2942c0`](https://github.com/mastra-ai/mastra/commit/b2942c0f3c99dd1edba9dc8c2c17bfa55c851ae8), [`99fab39`](https://github.com/mastra-ai/mastra/commit/99fab399c35952ae15427ea64845d4762e9ec144), [`d65d4d4`](https://github.com/mastra-ai/mastra/commit/d65d4d40a24a482d5b0ee83d9bab6042702ca1be), [`3589cde`](https://github.com/mastra-ai/mastra/commit/3589cde4ea8dd210df6b9a2355a3e568210965fc), [`07ff1b8`](https://github.com/mastra-ai/mastra/commit/07ff1b8eafbd9c7786ef77decc6be3b63497cfd9)]:
+  - @mastra/core@1.68.0-alpha.3
+  - @mastra/client-js@1.47.0-alpha.3
+  - @mastra/react@1.5.1-alpha.3
+
 ## 56.0.0-alpha.2
 
 ### Minor Changes

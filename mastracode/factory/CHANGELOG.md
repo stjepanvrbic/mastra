@@ -1,5 +1,15 @@
 # @mastra/factory
 
+## 0.16.0-alpha.3
+
+### Patch Changes
+
+- Fixed Factory skill dispatch sending a second kickoff into a binding whose previous run is still in flight. A new skill decision for a binding now waits for that binding's live run to end before delivering. This holds across dispatcher replicas: the dispatcher hosting a run records its ownership in the shared open-run ledger and heartbeats it, and a replica that sees a fresh claim from another owner retries later instead of starting a duplicate. A stale record left behind by a crashed run no longer blocks the binding. Delivery outcomes that could not be confirmed now fail with the stable codes `skill_delivery_ambiguous` and `run_terminal_event_missing` instead of `unknown`. ([#23968](https://github.com/mastra-ai/mastra/pull/23968))
+
+- Updated dependencies [[`b2942c0`](https://github.com/mastra-ai/mastra/commit/b2942c0f3c99dd1edba9dc8c2c17bfa55c851ae8), [`99fab39`](https://github.com/mastra-ai/mastra/commit/99fab399c35952ae15427ea64845d4762e9ec144), [`d65d4d4`](https://github.com/mastra-ai/mastra/commit/d65d4d40a24a482d5b0ee83d9bab6042702ca1be), [`3589cde`](https://github.com/mastra-ai/mastra/commit/3589cde4ea8dd210df6b9a2355a3e568210965fc), [`07ff1b8`](https://github.com/mastra-ai/mastra/commit/07ff1b8eafbd9c7786ef77decc6be3b63497cfd9)]:
+  - @mastra/core@1.68.0-alpha.3
+  - @mastra/code-sdk@1.7.3-alpha.3
+
 ## 0.16.0-alpha.2
 
 ### Patch Changes

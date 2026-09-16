@@ -1,5 +1,22 @@
 # @mastra/server
 
+## 1.68.0-alpha.3
+
+### Patch Changes
+
+- Added root span details to queryTraces results: name, entityId, parentSpanId, createdAt, metadata, and inputPreview. Trace lists can display these fields without fetching each full trace. createdAt uses the root span start time; inputPreview contains a shortened input preview rather than the full input. ([#23958](https://github.com/mastra-ai/mastra/pull/23958))
+
+  ```ts
+  const { traces } = await client.queryTraces({
+    timeRange: { from: '2026-09-01T00:00:00Z', to: '2026-09-15T00:00:00Z' },
+  });
+  // Previously required fetching the full trace:
+  console.log(traces[0]?.name, traces[0]?.inputPreview, traces[0]?.metadata);
+  ```
+
+- Updated dependencies [[`b2942c0`](https://github.com/mastra-ai/mastra/commit/b2942c0f3c99dd1edba9dc8c2c17bfa55c851ae8), [`99fab39`](https://github.com/mastra-ai/mastra/commit/99fab399c35952ae15427ea64845d4762e9ec144), [`d65d4d4`](https://github.com/mastra-ai/mastra/commit/d65d4d40a24a482d5b0ee83d9bab6042702ca1be), [`3589cde`](https://github.com/mastra-ai/mastra/commit/3589cde4ea8dd210df6b9a2355a3e568210965fc), [`07ff1b8`](https://github.com/mastra-ai/mastra/commit/07ff1b8eafbd9c7786ef77decc6be3b63497cfd9)]:
+  - @mastra/core@1.68.0-alpha.3
+
 ## 1.68.0-alpha.2
 
 ### Patch Changes
