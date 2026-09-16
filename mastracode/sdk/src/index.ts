@@ -240,6 +240,16 @@ function addPluginToolsToModeAllowlists(
 }
 
 export interface MastraCodeConfig {
+  /**
+   * Backing agent for the `AgentController` instead of the built-in code agent, so a host can run
+   * sessions on another agent implementation (an SDK-backed agent wrapping an external harness)
+   * while keeping Mastra Code's controller, workspace, storage and session lifecycle.
+   *
+   * The built-in agent resolves `extraTools` itself through its dynamic tool set, which an injected
+   * agent has no part in; they are therefore also passed to the controller as toolsets, and the
+   * factory form receives them so an agent that resolves its own tools can own them instead.
+   */
+  agent?: Agent | ((ctx: { tools: MastraCodeConfig['extraTools'] }) => Agent);
   /** Working directory for project detection. Default: process.cwd() */
   cwd?: string;
   /** Home directory for global config discovery. Default: os.homedir() */
@@ -1169,6 +1179,7 @@ export async function createMastraCodeAgentController(config?: MastraCodeConfig)
   }
 
   const typedStateSchema = stateSchema as PublicSchema<MastraCodeState>;
+  const injectedAgent = typeof config?.agent === 'function' ? config.agent({ tools: config.extraTools }) : config?.agent;
   const controller: AgentController<MastraCodeState> = new AgentController<MastraCodeState>({
     id: 'mastra-code',
     resourceId: project.resourceId,
@@ -1177,7 +1188,10 @@ export async function createMastraCodeAgentController(config?: MastraCodeConfig)
     memory,
     pubsub: signalsPubSub,
     stateSchema: typedStateSchema,
-    agent: codeAgent,
+    agent: injectedAgent ?? codeAgent,
+    ...(injectedAgent && config?.extraTools
+      ? { tools: config.extraTools as AgentControllerConfig<MastraCodeState>['tools'] }
+      : {}),
     subagents,
     gateways: [amazonBedrockGateway, mastraCodeGateway],
     workspace: config?.workspace ?? (args => getDynamicWorkspace(args)),
