@@ -21,6 +21,7 @@
 
 import { MastraAuthStudio } from '@mastra/auth-studio';
 import { prepareAgentControllerMount } from '@mastra/code-sdk';
+import type { MastraCodeConfig } from '@mastra/code-sdk';
 import type { MastraCodeState } from '@mastra/code-sdk/schema';
 import type { AgentControllerRequestContext } from '@mastra/core/agent-controller';
 import { AgentControllerChannels } from '@mastra/core/channels';
@@ -214,6 +215,8 @@ export interface MastraFactoryConfig {
    * Default: `factory-config-v1`.
    */
   configVersion?: string;
+  /** Backing agent for the session controller instead of Mastra Code's built-in code agent. */
+  agent?: MastraCodeConfig['agent'];
   /** Board definitions installed for this Factory instance. */
   boards?: readonly InstalledBoard[];
   /** Whether the built-in Work and Review boards are installed. Default: true. */
@@ -771,6 +774,7 @@ export class MastraFactory {
     const prepared = await timedPhase('prepare.controllerMount', () =>
       prepareAgentControllerMount({
         controllerId: CONTROLLER_ID,
+        ...(this.#config.agent ? { agent: this.#config.agent } : {}),
         coAuthor: { name: 'mastra-platform[bot]' },
         workspace: createWorkspaceFactory({
           ...(sandboxConfig ? { sandbox: sandboxConfig } : {}),
