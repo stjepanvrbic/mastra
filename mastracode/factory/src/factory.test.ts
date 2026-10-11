@@ -294,6 +294,24 @@ describe('MastraFactory.prepare', () => {
     expect(config.coAuthor).toEqual({ name: 'mastra-platform[bot]' });
   });
 
+  it('leaves commits without a co-author when coAuthor is null', async () => {
+    const config = await prepareFactory({ storage: fakeStorage(), auth: null, coAuthor: null });
+
+    expect(config.coAuthor).toBeNull();
+  });
+
+  it('adds the deployment instructions to unbound session prompts', async () => {
+    const config = await prepareFactory({ storage: fakeStorage(), auth: null, instructions: 'Post as the owner.' });
+    const context = new RequestContext();
+    context.set('controller', { getState: () => ({}) });
+
+    await expect(
+      (config.hostInstructions as (input: { requestContext: RequestContext }) => Promise<unknown>)({
+        requestContext: context,
+      }),
+    ).resolves.toBe('Post as the owner.');
+  });
+
   it('warns and falls back to plaintext when auth is enabled without secret encryption', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {

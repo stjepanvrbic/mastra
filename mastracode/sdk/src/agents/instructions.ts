@@ -14,7 +14,7 @@ export async function getDynamicInstructions({
 }: {
   requestContext: { get(key: string): unknown };
   hostInstructions?: string;
-  coAuthor?: { name?: string; email?: string };
+  coAuthor?: { name?: string; email?: string } | null;
   hasSubconscious?: boolean | ((state: MastraCodeState | undefined) => boolean);
   hasSubagents?: boolean;
 }): Promise<string> {
@@ -37,7 +37,7 @@ export async function getDynamicInstructionSections({
 }: {
   requestContext: { get(key: string): unknown };
   hostInstructions?: string;
-  coAuthor?: { name?: string; email?: string };
+  coAuthor?: { name?: string; email?: string } | null;
   /**
    * The subconscious knowledge tools are registered on the agent. A function
    * is resolved against the session state, since Factory sessions can refuse
@@ -65,7 +65,7 @@ export async function getDynamicInstructionSections({
     date: new Date().toISOString().split('T')[0]!,
     mode: modeId,
     modelId: agentControllerContext?.session?.modelId || undefined,
-    coAuthorName: coAuthor?.name,
+    coAuthorName: coAuthor === null ? null : coAuthor?.name,
     coAuthorEmail: coAuthor?.email,
     activePlan: state?.activePlan ?? null,
     modeId: modeId,

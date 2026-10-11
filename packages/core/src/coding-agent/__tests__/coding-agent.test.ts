@@ -417,6 +417,14 @@ describe('buildBasePrompt', () => {
     expect(prompt).not.toContain('Co-Authored-By: mastra-platform[bot] (openai/gpt-4o)');
   });
 
+  it('omits the Co-Authored-By instruction when coAuthorName is null', () => {
+    const prompt = buildBasePrompt(promptContext({ coAuthorName: null }));
+    expect(prompt).not.toContain('Co-Authored-By');
+    expect(prompt).toContain(
+      "Write commit messages that explain WHY, not just WHAT. Match the repo's existing style.\n",
+    );
+  });
+
   it('parameterizes the Co-Authored-By email', () => {
     const prompt = buildBasePrompt(promptContext({ coAuthorName: 'Acme Bot', coAuthorEmail: 'bot@acme.dev' }));
     expect(prompt).toContain('Co-Authored-By: Acme Bot <bot@acme.dev>');

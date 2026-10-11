@@ -316,8 +316,8 @@ export interface MastraCodeConfig {
   hostInstructions?:
     | string
     | ((ctx: { requestContext: RequestContext }) => string | undefined | Promise<string | undefined>);
-  /** Commit co-author identity included in coding-agent commit guidance. Unspecified fields use core defaults. */
-  coAuthor?: { name?: string; email?: string };
+  /** Commit co-author identity included in coding-agent commit guidance. Unspecified fields use core defaults; `null` omits the co-author. */
+  coAuthor?: { name?: string; email?: string } | null;
   /** Override id generation for threads/messages. Primarily useful for deterministic tests. */
   idGenerator?: AgentControllerConfig<MastraCodeState>['idGenerator'];
   /** Override interval handlers. Default: gateway-sync */

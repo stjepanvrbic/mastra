@@ -233,6 +233,13 @@ export interface MastraFactoryConfig {
   boards?: readonly InstalledBoard[];
   /** Whether the built-in Work and Review boards are installed. Default: true. */
   includeDefaultBoards?: boolean;
+  /**
+   * Co-author agents add to their commits. Default: `{ name: 'mastra-platform[bot]' }`.
+   * `null` leaves commits without a co-author.
+   */
+  coAuthor?: { name?: string; email?: string } | null;
+  /** Deployment instructions added to every Factory session's system prompt. */
+  instructions?: string;
 
   /**
    * Platform-specific overrides.
@@ -909,7 +916,7 @@ export class MastraFactory {
     const prepared = await timedPhase('prepare.controllerMount', () =>
       prepareAgentControllerMount({
         controllerId: CONTROLLER_ID,
-        coAuthor: { name: 'mastra-platform[bot]' },
+        coAuthor: this.#config.coAuthor === undefined ? { name: 'mastra-platform[bot]' } : this.#config.coAuthor,
         workspace: createWorkspaceFactory({
           ...(sandboxConfig ? { sandbox: sandboxConfig } : {}),
           ...(this.#config.sandboxStart ? { sandboxStart: this.#config.sandboxStart } : {}),
@@ -944,7 +951,10 @@ export class MastraFactory {
           const context = requestContext.get('controller') as
             | AgentControllerRequestContext<MastraCodeState>
             | undefined;
-          if (parseSupervisorResourceId(context?.resourceId)) return SUPERVISOR_INSTRUCTIONS;
+          const deploymentInstructions = this.#config.instructions;
+          if (parseSupervisorResourceId(context?.resourceId)) {
+            return [SUPERVISOR_INSTRUCTIONS, deploymentInstructions].filter(Boolean).join('\n\n');
+          }
           // The SDK resolves this callback before it loads repository
           // AGENTS.md/CLAUDE.md. A controller recreated after restart has
           // only initialState, and a partially persisted one can keep
@@ -979,7 +989,7 @@ export class MastraFactory {
               }
             }
           }
-          return undefined;
+          return deploymentInstructions;
         },
         // A factory reads the repository it works on and its skill, never the
         // ~/.claude instructions of whoever hosts the process. On the controller
