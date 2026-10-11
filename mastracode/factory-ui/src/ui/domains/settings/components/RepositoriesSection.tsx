@@ -51,7 +51,6 @@ export function RepositoriesSection() {
                 Manage GitHub connection
               </Button>
             ) : (
-              githubStatus &&
               canConnectGithub(githubStatus) && (
                 <Button size="sm" onClick={() => connectGithub(baseUrl)}>
                   Connect GitHub

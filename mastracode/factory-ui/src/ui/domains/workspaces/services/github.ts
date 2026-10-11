@@ -134,13 +134,8 @@ function currentPageRedirectTo(): string {
 }
 
 /** Whether the signed-in user can start the GitHub App connect flow on this deployment. */
-export function canConnectGithub(status: GithubStatus): boolean {
-  return (
-    status.enabled &&
-    !status.authRequired &&
-    status.reason !== 'missing_config' &&
-    status.reason !== 'organization_required'
-  );
+export function canConnectGithub(status: GithubStatus | undefined): boolean {
+  return status?.enabled === true && !status.organizationRequired && status.reason !== 'organization_required';
 }
 
 /** Begin the GitHub App install/connect flow (full-page redirect). */
