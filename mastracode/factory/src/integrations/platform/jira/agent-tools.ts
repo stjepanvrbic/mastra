@@ -18,7 +18,7 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 
 import type { IntegrationConnection } from '../../../capabilities/connection.js';
-import { JIRA_UNTRUSTED_CONTENT_NOTICE } from '../../jira/agent-tools.js';
+import { JIRA_CONTENT_NOTICE } from '../../jira/agent-tools.js';
 import { JiraApiError } from '../../jira/api.js';
 import type { PlatformJiraIntegration } from './integration.js';
 
@@ -49,7 +49,7 @@ function createJiraGetIssueTool(jira: PlatformJiraIntegration) {
         if (!detail) {
           return { error: `Jira issue "${issue}" was not found on this site.` };
         }
-        return { notice: JIRA_UNTRUSTED_CONTENT_NOTICE, ...detail };
+        return { notice: JIRA_CONTENT_NOTICE, ...detail };
       } catch (err) {
         return toolError('Failed to fetch Jira issue', err);
       }
