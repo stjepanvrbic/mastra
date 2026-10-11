@@ -188,6 +188,10 @@ export class LinearRules {
       };
     }
 
+    // A rule that declines an issue with no card leaves no record, so the same
+    // observation reaches the rule again instead of replaying the refusal.
+    if (rule && outcome.status === 'accepted' && decisions.length === 0 && !relatedItem) return 'missing';
+
     const committed = await this.options.storage.commitRuleEvaluation({
       orgId: input.orgId,
       factoryProjectId: input.factoryProjectId,

@@ -362,6 +362,21 @@ describe('LinearRules', () => {
     expect(await workItems.listDeferredDecisions('org-1', project.id)).toEqual([]);
   });
 
+  it('asks the rule again when it declined an issue that has no card', async () => {
+    let admit = false;
+    const { project, service, workItems } = await setup({
+      issueObserved: context => (admit ? resolveLinearRules().issueObserved?.(context) : undefined),
+    });
+    const input = { orgId: 'org-1', userId: 'user-1', factoryProjectId: project.id, issues: [issue] };
+
+    await service.ingest(input);
+    expect(await workItems.listDeferredDecisions('org-1', project.id)).toEqual([]);
+
+    admit = true;
+    await service.ingest(input);
+    expect(await workItems.listDeferredDecisions('org-1', project.id)).toHaveLength(1);
+  });
+
   it('persists replacement decisions without composing the default intake', async () => {
     const handler = vi.fn(() => ({
       type: 'notify' as const,
