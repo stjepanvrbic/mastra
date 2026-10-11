@@ -9,7 +9,7 @@ import { useGithubStatusQuery } from '../../../../hooks/useGithubStatus';
 import { useGitLabStatusQuery } from '../../../../hooks/useGitLabData';
 import { MASTRA_PROJECTS_URL } from '../../factory/services/gitlab';
 import { ConnectRepositoriesPanel } from '../../workspaces';
-import { manageGithubConnection } from '../../workspaces/services/github';
+import { canConnectGithub, connectGithub, manageGithubConnection } from '../../workspaces/services/github';
 import { FactorySetupSection } from './FactorySetupSection';
 import { GithubPatBlock } from './GithubPatBlock';
 import { ProviderConnectControl } from './PlatformProviderConnections';
@@ -21,7 +21,8 @@ export function RepositoriesSection() {
   const { factoryId } = useParams<{ factoryId: string }>();
   const { baseUrl } = useApiConfig();
   const factoryQuery = useFactoryQuery(factoryId);
-  const githubConnected = useGithubStatusQuery().data?.connected === true;
+  const githubStatus = useGithubStatusQuery().data;
+  const githubConnected = githubStatus?.connected === true;
   const gitlabStatus = useGitLabStatusQuery().data;
   const activeFactory = factoryQuery.data;
 
@@ -45,10 +46,17 @@ export function RepositoriesSection() {
         description={`Repositories ${activeFactory.name} can edit. What feeds the board is set under Work Intake.`}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {githubConnected && (
+            {githubConnected ? (
               <Button size="sm" onClick={() => manageGithubConnection(baseUrl)}>
                 Manage GitHub connection
               </Button>
+            ) : (
+              githubStatus &&
+              canConnectGithub(githubStatus) && (
+                <Button size="sm" onClick={() => connectGithub(baseUrl)}>
+                  Connect GitHub
+                </Button>
+              )
             )}
             {gitlabStatus?.mode === 'platform' &&
               (gitlabReconnectTarget ? (

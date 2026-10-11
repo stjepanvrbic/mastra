@@ -6,7 +6,6 @@ import { GithubIcon } from '@mastra/playground-ui/icons/GithubIcon';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 
-import { useApiConfig } from '../../../../api/config';
 import { useGitLabProjectsQuery, useGitLabStatusQuery } from '../../../../hooks/useGitLabData';
 import { useGithubReposQuery } from '../../../../hooks/useGithubRepos';
 import { useGithubStatusQuery } from '../../../../hooks/useGithubStatus';
@@ -15,7 +14,7 @@ import { gitLabProjectRepository } from '../../factory/services/gitlab';
 import { FolderIcon, GitLabIcon } from '../../../ui/icons';
 import { SkeletonRows } from '../../../ui/SkeletonRows';
 import type { FactoryProject, GithubStatus, SourceControlRepository } from '../services/github';
-import { connectGithub, isGitLabRepository } from '../services/github';
+import { isGitLabRepository } from '../services/github';
 
 /**
  * Repository linking for a server-backed Factory. Linked repositories retain
@@ -23,7 +22,6 @@ import { connectGithub, isGitLabRepository } from '../services/github';
  * source-control provider.
  */
 export function ConnectRepositoriesPanel({ factory }: { factory: FactoryProject }) {
-  const { baseUrl } = useApiConfig();
   const statusQuery = useGithubStatusQuery();
   const status = statusQuery.data;
   const githubConnected = status?.connected === true;
@@ -74,18 +72,7 @@ export function ConnectRepositoriesPanel({ factory }: { factory: FactoryProject 
         />
       )}
 
-      {!githubConnected && !gitlabConfigured && linked.length === 0 ? (
-        status &&
-        status.reason !== 'missing_config' &&
-        status.reason !== 'organization_required' && (
-          <div className="px-4 py-3">
-            <Button variant="primary" onClick={() => connectGithub(baseUrl)}>
-              <GithubIcon className="size-4" />
-              Connect GitHub
-            </Button>
-          </div>
-        )
-      ) : (
+      {(githubConnected || gitlabConfigured || linked.length > 0) && (
         <>
           <div className="px-4 py-2">
             <ListSearch label="Search repositories" placeholder="Search…" size="sm" value={query} onSearch={setQuery} />

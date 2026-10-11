@@ -55,6 +55,54 @@ describe('Repositories settings', () => {
     expect(reconnect.tagName).toBe('BUTTON');
   });
 
+  it('offers to connect GitHub when it is disconnected and the Factory already has repositories', async () => {
+    server.use(
+      http.get(`${TEST_BASE_URL}/auth/me`, () =>
+        HttpResponse.json({ authenticated: true, authEnabled: true, user: { userId: 'user-1' } }),
+      ),
+      http.get(`${TEST_BASE_URL}/web/factory/projects`, () =>
+        HttpResponse.json({ projects: [{ id: FACTORY_ID, name: 'factory-github' }] }),
+      ),
+      http.get(`${TEST_BASE_URL}/web/factory/projects/${FACTORY_ID}/source-control-connections`, () =>
+        HttpResponse.json({
+          connections: [
+            {
+              id: 'conn-1',
+              integrationId: 'github',
+              installationId: 'inst-1',
+              repositories: [
+                {
+                  id: 'repo-1',
+                  branch: 'main',
+                  sandboxWorkdir: '~/factory-github',
+                  repository: { slug: 'acme/factory-github', defaultBranch: 'main' },
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+      http.get(`${TEST_BASE_URL}/web/github/status`, () =>
+        HttpResponse.json({ enabled: true, connected: false, installations: [], reason: 'not_connected' }),
+      ),
+      http.get(`${TEST_BASE_URL}/web/gitlab/status`, () =>
+        HttpResponse.json({ enabled: false, configured: false, reason: 'missing_config' }),
+      ),
+      http.get(`${TEST_BASE_URL}/web/source-control/projects/repo-1/settings`, () =>
+        HttpResponse.json({ setupCommand: null, teardownCommand: null }),
+      ),
+      http.get(`${TEST_BASE_URL}/web/github/pat`, () =>
+        HttpResponse.json({ configured: false, reviewerConfigured: false }),
+      ),
+    );
+
+    renderRepositoriesSettings();
+
+    expect((await screen.findAllByText('acme/factory-github')).length).toBeGreaterThan(0);
+    expect(await screen.findAllByRole('button', { name: 'Connect GitHub' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Manage GitHub connection' })).not.toBeInTheDocument();
+  });
+
   it('shows GitLab repository details without unrelated GitHub settings for a GitLab-only Factory', async () => {
     let gitlabProjectReads = 0;
     server.use(
