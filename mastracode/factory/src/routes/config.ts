@@ -570,6 +570,11 @@ export interface ConfigRoutesDeps extends RouteDependencies {
    * defaults. Defaults to the standard app-data location; injectable for tests.
    */
   settingsPath?: string;
+  /**
+   * The one organization this deployment serves. Its admins may change the
+   * deployment-scoped settings in tenant mode; unset, those stay read-only.
+   */
+  organizationId?: string;
 }
 
 /**
@@ -595,6 +600,9 @@ export class ConfigRoutes extends Route<ConfigRoutesDeps> {
     const { controller, authStorage, auth } = options;
     const onCredentialsChanged = options.onCredentialsChanged ?? (() => {});
     const onCustomProvidersChanged = options.onCustomProvidersChanged ?? (() => {});
+    const canEditDeploymentSettings = async (c: Context): Promise<boolean> =>
+      !auth.enabled() ||
+      (options.organizationId !== undefined && (await auth.isOrganizationAdmin(c, options.organizationId)));
 
     // Factory-scoped OM reads without a stored row fall back to the low-cost
     // OM model of the factory default model's provider — not the global
@@ -949,8 +957,9 @@ export class ConfigRoutes extends Route<ConfigRoutesDeps> {
       // `models.modeThinkingDefaults`. These are what request-time resolution
       // falls back to when a session carries no explicit override — including
       // automated (rule-driven) Factory runs nobody opens interactively. In
-      // tenant mode, writes are disabled because the settings file is shared
-      // deployment-wide rather than scoped to an organization.
+      // tenant mode the settings file is shared deployment-wide rather than
+      // scoped to an organization, so only admins of the organization the
+      // deployment serves may write it.
 
       registerApiRoute('/web/config/thinking', {
         method: 'GET',
@@ -964,7 +973,7 @@ export class ConfigRoutes extends Route<ConfigRoutesDeps> {
               globalDefault: settings.preferences.thinkingLevel,
               modeDefaults: settings.models.modeThinkingDefaults,
               modes,
-              editable: !auth.enabled(),
+              editable: await canEditDeploymentSettings(loose(c)),
             });
           } catch (error) {
             return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
@@ -976,11 +985,11 @@ export class ConfigRoutes extends Route<ConfigRoutesDeps> {
         method: 'PUT',
         requiresAuth: false,
         handler: async c => {
-          if (auth.enabled()) {
+          if (!(await canEditDeploymentSettings(loose(c)))) {
             return c.json(
               {
                 error:
-                  'Deployment thinking defaults are shared by the whole deployment, so they cannot be changed while authentication is enabled',
+                  'Deployment thinking defaults are shared by the whole deployment, so only an admin of the organization it serves can change them',
               },
               403,
             );

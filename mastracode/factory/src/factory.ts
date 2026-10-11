@@ -187,6 +187,13 @@ export interface MastraFactoryConfig {
    * static host, so credentialed requests must be explicitly allowed.
    */
   allowedOrigins?: string[];
+  /**
+   * The one organization this deployment serves (the organization its auth
+   * provider admits, e.g. `MASTRA_ORGANIZATION_ID`). Its admins may then change
+   * deployment-scoped settings such as the thinking defaults; omitted, those
+   * are read-only whenever auth is enabled.
+   */
+  organizationId?: string;
   /** Sandbox configuration. Omitted → repository sandboxes are disabled. */
   sandbox?: MastraFactorySandboxConfig;
   /**
@@ -1219,6 +1226,7 @@ export class MastraFactory {
             intakeReady,
             factoryReady,
             knowledgeEnabled,
+            organizationId: this.#config.organizationId,
             configVersion,
             boardRegistry: this.#boards,
             factoryTransitionService: transitionService,

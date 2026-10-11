@@ -1134,7 +1134,11 @@ describe('thinking defaults routes', () => {
 
   function buildApp(
     user: { workosId: string; organizationId?: string } | null,
-    opts: { authEnabled?: boolean; isOrganizationAdmin?: (orgId: string, userId: string) => Promise<boolean> } = {},
+    opts: {
+      authEnabled?: boolean;
+      isOrganizationAdmin?: (orgId: string, userId: string) => Promise<boolean>;
+      organizationId?: string;
+    } = {},
   ) {
     const app = new Hono();
     app.use('*', async (c, next) => {
@@ -1150,6 +1154,7 @@ describe('thinking defaults routes', () => {
         }),
         controller,
         settingsPath,
+        ...(opts.organizationId ? { organizationId: opts.organizationId } : {}),
       }).routes(),
     );
     return app;
@@ -1225,5 +1230,22 @@ describe('thinking defaults routes', () => {
 
     const admin = buildApp(userA, { isOrganizationAdmin: async () => true });
     expect((await putThinking(admin, { globalDefault: 'high' })).status).toBe(403);
+  });
+
+  it('lets admins of the organization the deployment serves change the defaults', async () => {
+    const app = buildApp(userA, { organizationId: 'org1', isOrganizationAdmin: async orgId => orgId === 'org1' });
+
+    expect(await (await app.request('/web/config/thinking')).json()).toMatchObject({ editable: true });
+    const put = await putThinking(app, { modeDefaults: { plan: 'max' } });
+    expect(put.status).toBe(200);
+    expect(await put.json()).toEqual({ ok: true, globalDefault: 'off', modeDefaults: { plan: 'max' } });
+  });
+
+  it('keeps the defaults read-only for non-admins and admins of other organizations', async () => {
+    for (const isOrganizationAdmin of [async () => false, async (orgId: string) => orgId === 'org2']) {
+      const app = buildApp(userA, { organizationId: 'org1', isOrganizationAdmin });
+      expect(await (await app.request('/web/config/thinking')).json()).toMatchObject({ editable: false });
+      expect((await putThinking(app, { globalDefault: 'high' })).status).toBe(403);
+    }
   });
 });
