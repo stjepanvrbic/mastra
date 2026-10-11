@@ -4546,6 +4546,43 @@ describe('FactoryDecisionDispatcher', () => {
     );
   });
 
+  it.each([
+    [
+      'a review message',
+      { type: 'sendMessage', idempotencyKey: 'review-after-restart', message: 'Changes requested.' },
+    ],
+    ['a notification', { type: 'notify', idempotencyKey: 'notify-after-restart', title: 'Checks failed' }],
+  ] as const)('re-prepares the bound role when %s finds its session gone after a restart', async (_label, decision) => {
+    const storage = (await createFactoryStorageForTests()).workItems;
+    const { item, transitionService } = await queueDecision(storage, decision);
+    await bindWorkRun(storage, item.id);
+    const { controller, session, sendNotificationSignal } = createSession();
+    let restored = false;
+    controller.getSessionByResource.mockImplementation(async () => (restored ? session : undefined));
+    const prepareBinding = vi.fn(async () => {
+      await bindWorkRun(storage, item.id);
+      restored = true;
+    });
+    const dispatcher = new FactoryDecisionDispatcher({
+      controller: controller as never,
+      isAutoRunEnabled: async () => true,
+      transitionService,
+      storage,
+      ownerId: 'worker-1',
+      prepareBinding,
+    });
+
+    await dispatcher.runOnce(new Date('2030-01-01T00:00:00Z'));
+
+    expect(prepareBinding).toHaveBeenCalledWith(
+      expect.objectContaining({ item: expect.objectContaining({ id: item.id }), role: 'work' }),
+    );
+    expect(sendNotificationSignal).toHaveBeenCalledOnce();
+    expect(await storage.listDeferredDecisions('org-1', PROJECT_ID)).toEqual([
+      expect.objectContaining({ status: 'succeeded' }),
+    ]);
+  });
+
   it('recreates a missing controller session before dispatching to an active binding', async () => {
     const storage = (await createFactoryStorageForTests()).workItems;
     const { item, transitionService } = await queueDecision(storage, {

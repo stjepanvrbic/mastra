@@ -1152,7 +1152,7 @@ export class FactoryDecisionDispatcher {
         return;
       }
       case 'notify': {
-        const binding = await this.#requireBinding(record);
+        const binding = await this.#requireOrPrepareBinding(record, (await this.#requireBinding(record)).role);
         const session = await this.#requireSession(binding);
         await awaitNotification(() =>
           session.sendNotificationSignal({
@@ -1385,7 +1385,8 @@ export class FactoryDecisionDispatcher {
     if (decision.prepareBinding && decision.role !== undefined) {
       return this.#requireOrPrepareBinding(record, decision.role);
     }
-    return this.#findBinding(record, decision.role);
+    const binding = await this.#findBinding(record, decision.role);
+    return binding && this.#requireOrPrepareBinding(record, binding.role);
   }
 
   /**
@@ -1438,6 +1439,11 @@ export class FactoryDecisionDispatcher {
     );
   }
 
+  /**
+   * Controller sessions live in memory, so after a server restart an active
+   * binding's session is gone until something re-creates it. Re-preparing the
+   * role lands in the role's existing session rather than minting a new one.
+   */
   async #requireOrPrepareBinding(
     record: FactoryDeferredDecisionRecord,
     role: string,
