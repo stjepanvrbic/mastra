@@ -880,6 +880,18 @@ describe('createMastraCode', () => {
       expect(createStorageMock).not.toHaveBeenCalled();
     });
 
+    it("keeps the injected store's observability domain for the host's exporters", async () => {
+      const observability = { id: 'host-observability' };
+      class PostgresStore extends ForeignCompositeStore {
+        override stores = { observability };
+      }
+      const { createMastraCode } = await import('../index.js');
+
+      const { storage } = await createMastraCode({ storage: new PostgresStore() as any });
+
+      expect(storage.stores?.observability).toBe(observability);
+    });
+
     it('still requires an explicit backend for unrecognized foreign stores', async () => {
       class SomeOtherStore extends ForeignCompositeStore {}
       const { createMastraCode } = await import('../index.js');

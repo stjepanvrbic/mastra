@@ -694,8 +694,9 @@ export async function createMastraCodeAgentController(config?: MastraCodeConfig)
     default: storageResult.storage,
     domains: {
       // When local tracing is off, disable the observability domain entirely so
-      // trace/score/feedback writes never fall through to the default libsql store.
-      observability: observabilityDomain ?? false,
+      // trace/score/feedback writes never fall through to the default libsql
+      // store. A host that injects its own storage owns where its traces go.
+      observability: observabilityDomain ?? (injectedStorage ? undefined : false),
       harness: harnessStorage,
       scores: scoresStorage,
     },
