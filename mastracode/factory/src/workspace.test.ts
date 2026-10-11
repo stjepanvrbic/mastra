@@ -128,6 +128,7 @@ import {
   recordFailedSetupCommand,
 } from './sandbox/session-sandbox.js';
 import {
+  BUNDLED_FACTORY_SKILLS_PATH,
   createWorkspaceFactory,
   FactorySkillSource,
   REVIEW_ONLY_FACTORY_SKILLS,
@@ -1220,6 +1221,40 @@ describe('GitHub session workspace preparation', () => {
     expect(await workspace.skills?.get('factory-review')).toBeFalsy();
     expect(await workspace.skills?.get('factory-rereview')).toBeFalsy();
     expect((await workspace.skills?.get('factory-plan'))?.instructions).toContain('# Factory Plan');
+  });
+
+  it('picks up an in-place edit of a repo-local skill in a live session workspace', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'factory-skill-edit-'));
+    const skillFile = path.join(root, 'factory-skills', 'factory-plan', 'SKILL.md');
+    const bundled = await fs.readFile(path.join(BUNDLED_FACTORY_SKILLS_PATH, 'factory-plan', 'SKILL.md'), 'utf8');
+    await fs.mkdir(path.dirname(skillFile), { recursive: true });
+    await fs.writeFile(skillFile, `${bundled}\nLocal edit one.\n`);
+    const cwd = vi.spyOn(process, 'cwd').mockReturnValue(root);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const { resolver } = await createLocalFactory();
+      addProject();
+      addSession({ id: 'session-a' });
+      mocks.runBindingRole = 'work';
+      const workspace = (await resolver({ requestContext: createGithubRequestContext('project-1', 'session-a') }))!;
+      await workspace.skills?.maybeRefresh();
+      expect((await workspace.skills?.get('factory-plan'))?.instructions).toContain('Local edit one.');
+
+      // Rewriting the file leaves its directory's mtime alone, as most editors and scripts do.
+      const directory = await fs.stat(path.dirname(skillFile));
+      await fs.writeFile(skillFile, `${bundled}\nLocal edit two.\n`);
+      const later = new Date(Date.now() + 60_000);
+      await fs.utimes(skillFile, later, later);
+      await fs.utimes(path.dirname(skillFile), directory.atime, directory.mtime);
+      vi.setSystemTime(Date.now() + 120_000);
+      await workspace.skills?.maybeRefresh();
+
+      expect((await workspace.skills?.get('factory-plan'))?.instructions).toContain('Local edit two.');
+    } finally {
+      vi.useRealTimers();
+      cwd.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it('exposes review skills to a review session before it has a live thread', async () => {

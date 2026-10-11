@@ -998,6 +998,9 @@ export function createWorkspaceFactory(options: CreateWorkspaceFactoryOptions = 
       sandbox: sessionSandbox as unknown as ConstructorParameters<typeof Workspace>[0]['sandbox'],
       tools: MASTRACODE_WORKSPACE_TOOLS,
       skills: skillPaths,
+      // An edit that rewrites a SKILL.md in place leaves its directory's mtime
+      // alone, so a live session would keep serving the old instructions.
+      checkSkillFileMtime: true,
       // Project skill roots live in the sandbox checkout; guard them so skill
       // discovery before materialization (e.g. kickoff skill resolution in the
       // start coordinator) never forces sandbox provisioning.
